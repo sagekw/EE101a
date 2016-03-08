@@ -1,0 +1,19 @@
+This explains all the files
+
+    arduino_array : this contains the array (excluding the leading 0xff 0xff)
+    that goes into the Transmit.ino message array
+
+    encode.cpp : algorithm to encode the tom_lee.txt. Creates a file called
+    encoded_output
+
+    encoded_output: output of running encode.exe on tom_lee.txt. This is about
+    41% of the original tomo_lee.txt file size...Nice!
+
+    decode.cpp : algorithm to decode the encoded_output file produced by runing
+    make
+
+    decoded_output : produced wien running decode.exe on the encoded_output
+
+    
+
+
