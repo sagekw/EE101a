@@ -1,17 +1,17 @@
 #include <TimerOne.h>
+#include <avr/pgmspace.h>
 
 /* Pin Delarations */
 #define TX_PIN  13
 #define DEBUG_PIN 12
 
 /* Other Constants */
-#define TIMER_PERIOD   350 // microseconds, originally 10000
+#define TIMER_PERIOD   2000 // microseconds, originally 10000
 #define BITS_PER_BYTE      8
 
 
 /* Globals Variables */
 //byte message[] = "__It sure is nice when things are working the way they should.";
-
 const unsigned char message[] PROGMEM = {0xff, 0xff,
   0x7f, 0x7d, 0x0f, 0x0e, 0x76, 0x02, 0x76, 0x00, 0x7f, 0x7f, 0x71, 0x02,
   0x74, 0x08, 0x73, 0x05, 0xfe, 0x74, 0x01, 0x70, 0x00, 0x72, 0x01, 0x74,
@@ -545,12 +545,9 @@ const unsigned char message[] PROGMEM = {0xff, 0xff,
   0x81, 0x60, 0x21, 0x87, 0x6a, 0x89, 0x20, 0x80, 0x24, 0x80, 0x60, 0x80,
   0x28, 0x80, 0x6f, 0x63, 0x80, 0xf0, 0x71, 0x0c, 0xfe, 0x6f, 0x68, 0xb0,
   0x90, 0xdd, 0x93, 0xb3, 0x21, 0x81, 0x60, 0x23, 0x88, 0x60, 0x8f, 0x23,
-  0x81, 0x61, 0x80, 0xb1, 0x26, 0x80, 0x6f, 0x68, 0x10, 0xf8, 0x09, 0xfe
-};
-unsigned int encoded_output_len = 6398;
+  0x81, 0x61, 0x80, 0xb1, 0x26, 0x80, 0x6f, 0x68, 0x10, 0xf8, 0x09, 0xfe };
 
-
-//byte messageLength = sizeof(message);
+unsigned int encoded_output_len = sizeof(message);
 
 
 int byteIndex = 0;
@@ -568,7 +565,7 @@ void setup()
   /* Set Timer1 to run transmitNextBit() every TIMER_PERIOD microseconds */
   Timer1.initialize(TIMER_PERIOD);         
   Timer1.attachInterrupt(transmitNextBit); 
-  
+
   /* Intialize start of message sequence. */
  // message[0] = 0b11111111;
   //message[1] = 0b11111111;
@@ -582,22 +579,98 @@ void loop() {}
 /* Timer Interrupt Service Routine */
 void transmitNextBit()
 {
+  unsigned char the_byte = pgm_read_byte_near(message + byteIndex);
   /* Determine next bit to transmit. */
-  int bit = bitRead(message[byteIndex], bitIndex);
+  int bit = bitRead(the_byte, bitIndex);
   bitIndex++;
   
   /* Check if we've completed the current byte. */
   if(bitIndex == BITS_PER_BYTE)
   {
+    //Serial.println(the_byte, HEX);
     bitIndex = 0;
     byteIndex++;
-    if(byteIndex == encoded_output_len)
+    //processByte(the_byte);
+    if(byteIndex == encoded_output_len) {
       byteIndex = 0;
+    }
   }
   
   /* Trasmit the next bit */
   digitalWrite(TX_PIN, bit);
-  digitalWrite(DEBUG_PIN, debug);
-  debug ^= 1;
 }  
+
+
+
+/* decoding map */
+static inline char decode_char(uint8_t encoded_char) {
+    switch (encoded_char) {
+        case 0xf8:
+            return ',';
+        case 0xf0:
+            return ':';
+        case 0xe0:
+            return '=';
+        case 0xd0:
+            return 'Z';
+        case 0xc0:
+            return '~';
+        case 0xb0:
+            return '8';
+        case 0xa0:
+            return '7';
+        case 0x90:
+            return 'O';
+        case 0x80:
+            return 'N';
+        case 0x70:
+            return '.';
+        case 0x60:
+            return 'M';
+        case 0x50:
+            return '?';
+        case 0x40:
+            return '+';
+        case 0x30:
+            return 'I';
+        case 0x20:
+            return 'D';
+        case 0x10:
+            return '$';
+        case 0x0:
+            return ' ';
+        default:
+            return ' ';
+    }
+}
+
+#define LOWER_FOUR 0xf
+#define UPPER_FOUR 0xf0
+#define LOWER_THREE 0x7
+#define UPPER_FIVE 0xf8
+
+inline 
+void processByte(uint8_t encoded_byte)
+{
+  if( encoded_byte != 255 ) { 
+    if(encoded_byte == 0xfe) {
+      Serial.println();
+    } else {
+      int count = 0;
+      uint8_t ch;
+      if((encoded_byte & UPPER_FIVE) == UPPER_FIVE) { // encoding of comma
+        count = (encoded_byte & LOWER_THREE) + 1;  // comma is specail because it's encoding is the five upper
+        ch = 0xf8; // comma's encoding                // bits whereas everything else is only 4 bits. This is because
+      } else {                                        // there are 17 chars (16 could be represented in just the upper
+        count = (encoded_byte & LOWER_FOUR) + 1;      // 4 bits, and the 17th uses one additional bit). I chose the comma
+        ch = (encoded_byte & UPPER_FOUR);             // to be the character with one additional bit because it's one
+      }                                               // of the least frequently used character.
+      int j;
+      char to_print = decode_char(ch); // use map to get the actual character
+      for(j = 0; j < count; j++) {
+        Serial.print(to_print);
+      }
+    }
+  }
+}
 

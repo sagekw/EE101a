@@ -6,8 +6,8 @@
 #define DEBUG_PIN 13
 
 /* Other Constants */
-#define COUNTS 8
-#define SAMPLE_PERIOD  350 // microseconds, originally 10000
+#define COUNTS 4
+#define SAMPLE_PERIOD  2000 // microseconds, originally 10000
 #define TIMER_PERIOD   SAMPLE_PERIOD/COUNTS // microseconds
 #define START_SIZE        16
 #define BITS_PER_BYTE      8
@@ -22,7 +22,7 @@
 boolean set = false;
 int numOnes = 0;
 int bitIndex = 0;
-char currentByte = 0;
+unsigned char currentByte = 0;
 int sendbit = 0;
 boolean foundEdge = false;
 int timerCounter = 0;
@@ -34,7 +34,7 @@ void setup()
   pinMode(RX_PIN, INPUT);
   attachInterrupt(digitalPinToInterrupt(RX_PIN), edgeDetect, CHANGE);
   pinMode(DEBUG_PIN, OUTPUT);
-  Serial.begin(115200); 
+  Serial.begin(230400); 
 
   /* Set Timer1 to run receiveNextBit() every TIMER_PERIOD microseconds */
   Timer1.initialize( TIMER_PERIOD );
@@ -50,7 +50,6 @@ void loop() {
 /* Manage edge detection */
 void edgeDetect() {
   timerCounter = 0;
-  foundEdge = true;
 }
 
 
@@ -76,7 +75,8 @@ void receiveNextBit()
 inline
 void processBit(int bit)
 {
-  if(set) {
+  //if(set) {
+  if(set) { // just pick up reading immediately
     /* Write the bit into the current byte. */
     bitWrite(currentByte, bitIndex, bit);
     bitIndex++;
@@ -85,13 +85,16 @@ void processBit(int bit)
     if(bitIndex == BITS_PER_BYTE)
     {
       bitIndex = 0;
-      processByte(currentByte);
+      if( currentByte != 255 ) {
+        processByte(currentByte);
+      }
+      //currentByte = 0;
     }
   }
 }
 
 /* decoding map */
-static inline char decode_char(unsigned char encoded_char) {
+static inline char decode_char(uint8_t encoded_char) {
     switch (encoded_char) {
         case 0xf8:
             return ',';
@@ -128,6 +131,7 @@ static inline char decode_char(unsigned char encoded_char) {
         case 0x0:
             return ' ';
         default:
+            set = false;
             return ' ';
     }
 }
@@ -137,28 +141,29 @@ static inline char decode_char(unsigned char encoded_char) {
  * alphanumeric, white space or punctuation.
  */
 inline 
-void processByte(char b)
+void processByte(uint8_t encoded_byte)
 {
-  unsigned char encoded_byte = b; // make sure it's interpretted unsigned
-  char new_line = (encoded_byte ^ 0xfe); // 0xfe is the sequence for a line break
-  if(new_line == 0) {
-    Serial.println();
-  } else {
-    int count;
-    unsigned char ch;
-    if((encoded_byte & UPPER_FIVE) == UPPER_FIVE) { // encoding of comma
-      count = (encoded_byte & LOWER_THREE) + 1;     // comma is specail because it's encoding is the five upper
-      ch = 0xf8; // comma's encoding                // bits whereas everything else is only 4 bits. This is because
-    } else {                                        // there are 17 chars (16 could be represented in just the upper
-      count = (encoded_byte & LOWER_FOUR) + 1;      // 4 bits, and the 17th uses one additional bit). I chose the comma
-      ch = (encoded_byte & UPPER_FOUR);             // to be the character with one additional bit because it's one
-    }                                               // of the least frequently used character.
-    int j;
-    ch = decode_char(ch); // use map to get the actual character
-    for(j = 0; j < count; j++) {
-      Serial.print(ch);
+  if( ( encoded_byte != 255 ) && ( set ) ) { 
+    if(encoded_byte == 0xfe) {
+      Serial.println();
+    } else {
+      int count = 0;
+      uint8_t ch;
+      if((encoded_byte & UPPER_FIVE) == UPPER_FIVE) { // encoding of comma
+        count = (encoded_byte & LOWER_THREE) + 1;  // comma is specail because it's encoding is the five upper
+        ch = 0xf8; // comma's encoding                // bits whereas everything else is only 4 bits. This is because
+      } else {                                        // there are 17 chars (16 could be represented in just the upper
+        count = (encoded_byte & LOWER_FOUR) + 1;      // 4 bits, and the 17th uses one additional bit). I chose the comma
+        ch = (encoded_byte & UPPER_FOUR);             // to be the character with one additional bit because it's one
+      }                                               // of the least frequently used character.
+      int j;
+      char to_print = decode_char(ch); // use map to get the actual character
+      for(j = 0; j < count; j++) {
+        Serial.print(to_print);
+      }
     }
   }
+  
 /*
   if((b >= 32 && b <= 126) || b == '\n' || b == '\r' || b == '\t')
     Serial.print(b);
@@ -183,7 +188,6 @@ void countOnes(int bit)
       numOnes = 0;
       bitIndex = 0;
       set = true;
-      Serial.println();
     }
   }
   else

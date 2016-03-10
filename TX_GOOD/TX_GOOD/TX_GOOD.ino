@@ -5,7 +5,7 @@
 #define TX_PIN  13
 
 /* Other Constants */
-#define TIMER_PERIOD     400 // microseconds, originally 10000
+#define TIMER_PERIOD     500 // microseconds, originally 10000
 #define BITS_PER_BYTE       8
 
 

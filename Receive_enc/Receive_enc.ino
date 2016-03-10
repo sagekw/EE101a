@@ -6,8 +6,8 @@
 #define DEBUG_PIN 13
 
 /* Other Constants */
-#define COUNTS 10
-#define SAMPLE_PERIOD  400 // microseconds, originally 10000
+#define COUNTS 20
+#define SAMPLE_PERIOD  300 // microseconds, originally 10000
 #define TIMER_PERIOD   SAMPLE_PERIOD/COUNTS // microseconds
 #define START_SIZE        16
 #define BITS_PER_BYTE      8
@@ -18,7 +18,6 @@ int numOnes = 0;
 int bitIndex = 0;
 char currentByte = 0;
 int sendbit = 0;
-boolean foundEdge = false;
 int timerCounter = 0;
 
 
@@ -26,7 +25,7 @@ int timerCounter = 0;
 void setup()
 {
   pinMode(RX_PIN, INPUT);
-  attachInterrupt(digitalPinToInterrupt(RX_PIN), edgeDetect, CHANGE);
+  //attachInterrupt(digitalPinToInterrupt(RX_PIN), edgeDetect, CHANGE);
   pinMode(DEBUG_PIN, OUTPUT);
   Serial.begin(115200); 
 
@@ -44,25 +43,32 @@ void loop() {
 /* Manage edge detection */
 void edgeDetect() {
   timerCounter = 0;
-  foundEdge = true;
+  //sendbit = sendbit^0x1;
 }
 
 
 /* Timer Interrupt Service Routine */
 void receiveNextBit()
 {
-  if( timerCounter == (COUNTS/2 - 1) ) {
-    /* Read the current bit. */
+  sendbit = sendbit^0x1;
+  digitalWrite(DEBUG_PIN, sendbit);
+  
+  /*
+   if( timerCounter == (COUNTS/2 - 1) ) {
     int _bit = digitalRead(RX_PIN);
+    
 
-    processBit( _bit );
-    countOnes( _bit );
+    //processBit( _bit );
+    //countOnes( _bit );
   }
+  */
+  /*
   if( timerCounter == (COUNTS-1) ) {
     timerCounter = 0;
   } else {
     timerCounter++;
   }
+  */
 }
 
 
@@ -97,6 +103,8 @@ void processByte(char b)
     Serial.print(b);
   else
     set = false;
+    //sendbit = sendbit^0x1;
+    //digitalWrite(DEBUG_PIN, sendbit);
 }
 
 
